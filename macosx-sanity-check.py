@@ -26,6 +26,8 @@ import subprocess
 import re
 from distutils.version import StrictVersion
 
+# FIXME: Take deployment target as cmd-line arg
+#DEPLOYMENT_TARGET = StrictVersion('10.12')
 DEPLOYMENT_TARGET = StrictVersion('10.8')
 ARCHITECTURE = 'x86_64'
 
@@ -45,6 +47,7 @@ def get_deployment_target(otool_output):
 
 def get_rpath(otool_output):
     m = re.search("LC_RPATH\n(.*)\n\s+path ([^ ]+)", otool_output, re.MULTILINE)
+    if not m: return ''
     return m.group(2)
 
 def get_load_commands(binary):
@@ -95,7 +98,7 @@ def lookup_library(file):
             found = os.path.join("/Library/Frameworks", file)
             if DEBUG: print("Framework found: " + str(found))
         else:
-            for path in os.getenv("DYLD_LIBRARY_PATH").split(':'):
+            for path in os.getenv("DYLD_LIBRARY_PATH", "").split(':'):
                 abs = os.path.join(path, file)
                 if os.path.exists(abs): found = abs
                 if DEBUG: print("Library found: " + str(found))
@@ -134,7 +137,7 @@ def validate_lib(lib):
     # Check deployment target
     deploymenttarget = StrictVersion(get_deployment_target(output))
     if deploymenttarget > DEPLOYMENT_TARGET:
-        print("Error: Unsupported deployment target " + m.group(2) + " found: " + lib)
+        print("Error: Unsupported deployment target " + str(deploymenttarget) + " found: " + lib)
         return False
     
     # This is a check for a weak symbols from a build made on 10.12 or newer sneaking into a build for an
@@ -179,7 +182,6 @@ def process_executable(executable):
         dep = pending.pop()
         if DEBUG: print("Evaluating " + dep)
         deps = find_dependencies(dep)
-        assert(deps)
         for d in deps:
             absfile = lookup_library(d)
             if absfile == None:
